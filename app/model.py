@@ -70,5 +70,38 @@ def evaluate_model(model, X_test, y_test):
     plt.title("Confusion Matrix")
     plt.show()
     
+def extract_keywords(text, vectorizer, model, top_n=5):
+    """
+    Extract the top N keywords from the text based on the model's coefficients.
+
+    Args:
+        text (str): The input text.
+        vectorizer (_type_): The TF-IDF vectorizer.
+        model (_type_): The trained model.
+        top_n (int, optional): Number of top keywords to extract. Defaults to 5.
+    """
+    
+    text_vectorized = vectorizer.transform([text])
+    feature_names = np.array(vectorizer.get_feature_names_out())
+    weights = text_vectorized.toarray().flatten()
+    
+    present_indices = np.where(weights > 0)[0]
+    
+    if len(present_indices) == 0:
+        return []
+
+    if model.coef_.shape[0] > 1:
+        coef = model.coef_[1]
+    else:
+        coef = model.coef_[0]
+    
+    importance = weights[present_indices] * coef[present_indices]
+    top_indices_local = np.argsort(importance)[-top_n:][::-1]
+    top_indices_global = present_indices[top_indices_local]
+    
+    keywords = feature_names[top_indices_global]
+    
+    return keywords.tolist()
+    
     
     
