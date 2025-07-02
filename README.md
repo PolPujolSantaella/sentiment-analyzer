@@ -30,7 +30,7 @@ This project demonstrates real-world skills in NLP, model deployment, and buildi
 ```bash
 ├── app/ # Python backend
 │ ├── init.py
-│ ├── main.py # FastAPI app
+│ ├── api.py # FastAPI app
 │ ├── utils.py # Preprocessing utilities
 │ ├── model.py # Keyword extraction, model helpers
 │
@@ -50,6 +50,7 @@ This project demonstrates real-world skills in NLP, model deployment, and buildi
 ├── data/ # Datasets (raw and cleaned)
 ├── Dockerfile
 ├── requirements.txt
+├── main.py  # Create app
 └── README.md
 ```
 
