@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requeriments-api.txt .
 
 RUN pip install --upgrade pip
-
 RUN pip install --no-cache-dir -r requeriments-api.txt
 
+COPY main.py ./main.py
 COPY ./app ./app
 COPY ./models ./models
 COPY ./static ./static

@@ -6,4 +6,5 @@ nltk==3.9.1
 joblib==1.5.1
 pandas==2.3.0
 numpy==1.26.4
+seaborn==0.12.2
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
