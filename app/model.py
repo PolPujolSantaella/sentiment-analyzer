@@ -129,14 +129,7 @@ def train_model(X_train, y_train, model_type='logistic', cv_folds=3, random_stat
     
     return grid.best_estimator_, grid.best_params_
 
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.svm import LinearSVC
-from sklearn.ensemble import RandomForestClassifier
-import xgboost as xgb
-
-def train_model_emotions(X_train, y_train, model_type='logistic', random_state=42):
+def train_model_emotions(X_train, y_train, model_type='logistic', cv_folds=3,  random_state=42):
     """
     Entrena el modelo directamente sin hacer búsqueda de hiperparámetros.
     
@@ -150,47 +143,52 @@ def train_model_emotions(X_train, y_train, model_type='logistic', random_state=4
         Modelo entrenado.
     """
     if model_type == 'logistic':
-        model = OneVsRestClassifier(
-            LogisticRegression(
-                max_iter=500,
-                random_state=random_state,
-                penalty='l2',
-                solver='lbfgs'
-            )
-        )
-    elif model_type == 'naive_bayes':
-        model = MultinomialNB(alpha=1.0, fit_prior=True)
-    elif model_type == 'svm':
-        model = LinearSVC(C=1.0, loss='squared_hinge', dual=True, max_iter=5000, random_state=random_state)
-    elif model_type == 'random_forest':
-        model = RandomForestClassifier(
-            n_estimators=30,
-            max_depth=10,
-            max_samples=0.8,
-            min_samples_split=5,
-            min_samples_leaf=3,
-            max_features='sqrt',
-            random_state=random_state
-        )
-    elif model_type == 'xgboost':
-        model = xgb.XGBClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
-            subsample=0.8,
-            colsample_bytree=0.7,
-            gamma=0,
-            reg_alpha=0,
-            reg_lambda=1,
-            eval_metric='mlogloss',
-            use_label_encoder=False,
-            random_state=random_state
-        )
-    else:
-        raise ValueError("Unsupported model_type. Choose from 'logistic', 'naive_bayes', 'svm', 'random_forest', 'xgboost'.")
+        model = OneVsRestClassifier(LogisticRegression(
+            max_iter=300, 
+            random_state=random_state, 
+            penalty='l2',
+            solver='lbfgs',
+            class_weight='balanced'))
 
-    model.fit(X_train, y_train)
-    return model
+        param_grid = [
+            {
+                'estimator__C': [0.01, 0.1, 1],
+            }
+     ]
+    elif model_type == 'naive_bayes':
+        model = MultinomialNB()
+        param_grid = {
+            'alpha': [0.01, 0.1, 0.5, 1.0, 2.0],     # Suavizado
+            'fit_prior': [True, False]                      # ¿Ajustar priors?
+        }
+    elif model_type == 'svm':
+        model = LinearSVC(random_state=random_state, max_iter=2000, class_weight='balanced')
+        param_grid = [
+        {  
+            'estimator__C': [0.1, 0.5, 1],
+            "estimator__loss": ['squared_hinge'],
+            'estimator__dual': [True]
+        }
+    ]
+    elif model_type == 'random_forest':
+        model = RandomForestClassifier(random_state=random_state, class_weight='balanced_subsample')
+        param_grid = {
+            'n_estimators': [50, 100],       # Menos árboles, menos tiempo
+            'max_depth': [None, 10, 20],         # Profundidad controlada
+            'min_samples_split': [2, 5],     # Separaciones básicas
+            'min_samples_leaf': [1, 2],      # Suavizado ligero
+            'max_features': ['sqrt', 'log2']         # Escoge raíz cuadrada de features para velocidad
+        }
+    else:
+        raise ValueError("Unsupported model type. Choose from 'logistic', 'naive_bayes', or 'svm'.")
+
+    grid = GridSearchCV(model, param_grid, cv=cv_folds, scoring='accuracy', n_jobs=-1)
+    grid.fit(X_train, y_train)
+    
+    print(f"Best parameters for {model_type} model: {grid.best_params_}")
+    print(f"Best cross-validation score: {grid.best_score_:.4f}")
+    
+    return grid.best_estimator_, grid.best_params_
 
 
 def evaluate_model(model, X_test: np.ndarray, y_test: np.ndarray, labels: List[str] = ["Neg", "Pos"]) -> float:
