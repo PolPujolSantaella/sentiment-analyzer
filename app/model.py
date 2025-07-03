@@ -7,6 +7,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.multiclass import OneVsRestClassifier
+import xgboost as xgb
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
@@ -43,7 +46,7 @@ def vectorize_text(train_texts: List[str], test_texts: List[str],
     return X_train, X_test, vectorizer
 
 
-def train_model(X_train, y_train, model_type='logistic', cv_folds=5, random_state=42
+def train_model(X_train, y_train, model_type='logistic', cv_folds=3, random_state=42
                    ) -> Union[LogisticRegression, MultinomialNB, LinearSVC]:
     """
     Perform grid search with cross-validation to find the best hyperparameters.
@@ -81,7 +84,7 @@ def train_model(X_train, y_train, model_type='logistic', cv_folds=5, random_stat
             'fit_prior': [True, False]                      # ¿Ajustar priors?
         }
     elif model_type == 'svm':
-        model = LinearSVC(random_state=random_state, max_iter=5000)
+        model = LinearSVC(random_state=random_state, max_iter=500)
         param_grid = [
         {  
             'C': [0.01, 0.1, 1, 10],
@@ -94,6 +97,27 @@ def train_model(X_train, y_train, model_type='logistic', cv_folds=5, random_stat
             'dual': [True, False]
         }
     ]
+    elif model_type == 'random_forest':
+        model = RandomForestClassifier(random_state=random_state)
+        param_grid = {
+            'n_estimators': [50, 100],       # Menos árboles, menos tiempo
+            'max_depth': [None, 10],         # Profundidad controlada
+            'min_samples_split': [2, 5],     # Separaciones básicas
+            'min_samples_leaf': [1, 2],      # Suavizado ligero
+            'max_features': ['sqrt']         # Escoge raíz cuadrada de features para velocidad
+        }
+    elif model_type == 'xgboost':
+        model = xgb.XGBClassifier(random_state=random_state, eval_metric='logloss')
+        param_grid = {
+            'n_estimators': [50, 100],
+            'max_depth': [3, 6],                 # Profundidad moderada
+            'learning_rate': [0.05, 0.1],       # Aprende con calma
+            'subsample': [0.8],                  # Menos muestra para agilizar
+            'colsample_bytree': [0.7],           # Menos columnas para cada árbol
+            'gamma': [0],                       # Sin corte extra para simplificar
+            'reg_alpha': [0],                   # Sin regularización extra para empezar
+            'reg_lambda': [1]                   # Regularización estándar
+        }
     else:
         raise ValueError("Unsupported model type. Choose from 'logistic', 'naive_bayes', or 'svm'.")
 
@@ -104,6 +128,70 @@ def train_model(X_train, y_train, model_type='logistic', cv_folds=5, random_stat
     print(f"Best cross-validation score: {grid.best_score_:.4f}")
     
     return grid.best_estimator_, grid.best_params_
+
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
+
+def train_model_emotions(X_train, y_train, model_type='logistic', random_state=42):
+    """
+    Entrena el modelo directamente sin hacer búsqueda de hiperparámetros.
+    
+    Args:
+        X_train (np.ndarray): Features de entrenamiento.
+        y_train (np.ndarray): Labels de entrenamiento.
+        model_type (str, optional): Tipo de modelo ('logistic', 'naive_bayes', 'svm', 'random_forest', 'xgboost').
+        random_state (int, optional): Semilla aleatoria.
+    
+    Returns:
+        Modelo entrenado.
+    """
+    if model_type == 'logistic':
+        model = OneVsRestClassifier(
+            LogisticRegression(
+                max_iter=500,
+                random_state=random_state,
+                penalty='l2',
+                solver='lbfgs'
+            )
+        )
+    elif model_type == 'naive_bayes':
+        model = MultinomialNB(alpha=1.0, fit_prior=True)
+    elif model_type == 'svm':
+        model = LinearSVC(C=1.0, loss='squared_hinge', dual=True, max_iter=5000, random_state=random_state)
+    elif model_type == 'random_forest':
+        model = RandomForestClassifier(
+            n_estimators=30,
+            max_depth=10,
+            max_samples=0.8,
+            min_samples_split=5,
+            min_samples_leaf=3,
+            max_features='sqrt',
+            random_state=random_state
+        )
+    elif model_type == 'xgboost':
+        model = xgb.XGBClassifier(
+            n_estimators=100,
+            max_depth=6,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.7,
+            gamma=0,
+            reg_alpha=0,
+            reg_lambda=1,
+            eval_metric='mlogloss',
+            use_label_encoder=False,
+            random_state=random_state
+        )
+    else:
+        raise ValueError("Unsupported model_type. Choose from 'logistic', 'naive_bayes', 'svm', 'random_forest', 'xgboost'.")
+
+    model.fit(X_train, y_train)
+    return model
+
 
 def evaluate_model(model, X_test: np.ndarray, y_test: np.ndarray, labels: List[str] = ["Neg", "Pos"]) -> float:
     """
